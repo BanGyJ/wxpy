@@ -25,6 +25,7 @@ from ..compatible.utils import force_encoded_string_output
 from ..utils import PuidMap
 from ..utils import enhance_connection, enhance_webwx_request, ensure_list, get_user_name, handle_response, \
     start_new_thread, wrap_user_name
+from ..signals import stopped
 
 logger = logging.getLogger(__name__)
 
@@ -426,8 +427,11 @@ class Bot(object):
         if not self.alive:
             return
 
-        config = self.registered.get_config(msg)
+        configs = self.registered.get_config(msg)
+        for config in configs:
+            self._process_by_conf(msg, config)
 
+    def _process_by_conf(self, msg, config):
         logger.debug('{}: new message (func: {}):\n{}'.format(
             self, config.func.__name__ if config else None, msg))
 
@@ -486,6 +490,7 @@ class Bot(object):
                 self._process_message(msg)
         finally:
             self.is_listening = False
+            stopped.send()
             logger.info('{}: stopped'.format(self))
 
     def start(self):
@@ -515,7 +520,6 @@ class Bot(object):
         """
         堵塞进程，直到结束消息监听 (例如，机器人被登出时)
         """
-
         if isinstance(self.listening_thread, Thread):
             try:
                 logger.info('{}: joined'.format(self))
